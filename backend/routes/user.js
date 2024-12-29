@@ -1,9 +1,10 @@
 const express=require('express');
 const zod=require("zod")
 const router=express.Router();
-const {User}=require('./../db')
+const {User, Account}=require('./../db')
 const jwt=require("jsonwebtoken");
 const { JWT_SECRET } = require('../config');
+const authmiddleware=require('./../middleware')
 //Signup and signin routes
 
 const signupSchema=zod.object({
@@ -19,6 +20,12 @@ const signinSchema=zod.object({
     password:zod.string()
 })
 
+const updateBody=zod.object({
+    password:zod.string().min(6),
+    firstName:zod.string,
+    lastName:zod.string()
+})
+
 router.post('/signup',async (req,res)=>{
 const body=req.body;
 const {success}=signupSchema.safeParse(body);
@@ -28,7 +35,7 @@ if(!success){
     })
 }
 const user= await User.findOne({
-    username:body.username
+    username:req.body.username
 })
 if(user._id){
     return res.json({
@@ -36,8 +43,16 @@ if(user._id){
     })
 }
 const dbuser=await User.create(body);
+
+const userId=dbuser._id;
+
+await Account.create({
+    userId,
+    balance:1+Math.random()*1000
+})
+
 const token=jwt.sign({
-    userid:dbuser._id
+    userId
 },JWT_SECRET);
 
 res.json({
@@ -46,7 +61,7 @@ res.json({
 })
 
 })
-router.post('/signin',async (req,res)=>{
+router.post('/signin',async (req,res)=>{ 
     const body=req.body;
     const {success}=siginSchema.safeParse(body);
     if(!success){
@@ -57,7 +72,6 @@ router.post('/signin',async (req,res)=>{
     const user= await User.findOne({
         username:req.body.username,
         password:req.body.password
-
     });
     if(user){
         const token=jwt.sign({
@@ -72,5 +86,45 @@ router.post('/signin',async (req,res)=>{
         msg:"Error while logging in"
     })
 })
+router.put('/update',authmiddleware,async (res,req)=>{
+    const body=req.body;
+    const {success}=updateBody.safeParse(body);
+    if(!success){
+        res.status(411).json({
+           message: "Error while updating information"
+        })
+    }
+
+    await User.updateOne(req.body,{
+        _id:req.userId
+    })
+
+    res.json({
+        msg:"Updated successfully"
+    })
+})
+
+router.get('/bulk', async (req,res)=>{
+    const filter=req.query.filter || "";
+
+    const users=await User.find({
+        $or: [{
+            firstName:{"$regex":filter}
+        },{
+            lastName:{"regex":filter}
+        }]
+    })
+    res.json({
+        user:users.map(user=>({
+            username:user.username,
+            firstName:user.firstName,
+            lastName:user.lastName,
+            _id:user._id
+        }))
+    })
+})
+
+
+
 
 module.exports=router;
