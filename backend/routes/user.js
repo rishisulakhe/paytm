@@ -37,7 +37,7 @@ if(!success){
 const user= await User.findOne({
     username:req.body.username
 })
-if(user._id){
+if(user){
     return res.json({
         msg:"Email already exists / Incorrect inputs"
     })
@@ -63,7 +63,7 @@ res.json({
 })
 router.post('/signin',async (req,res)=>{ 
     const body=req.body;
-    const {success}=siginSchema.safeParse(body);
+    const {success}=signinSchema.safeParse(body);
     if(!success){
         return res.status(411).json({
             message: "Error while logging in"
@@ -86,23 +86,37 @@ router.post('/signin',async (req,res)=>{
         msg:"Error while logging in"
     })
 })
-router.put('/update',authmiddleware,async (res,req)=>{
-    const body=req.body;
-    const {success}=updateBody.safeParse(body);
-    if(!success){
-        res.status(411).json({
-           message: "Error while updating information"
-        })
+router.put('/update', authmiddleware, async (req, res) => {
+    const body = req.body;
+
+    // Validate the request body
+    const { success } = updateBody.safeParse(body);
+    if (!success) {
+        return res.status(411).json({
+            message: "Error while updating information"
+        });
     }
 
-    await User.updateOne(req.body,{
-        _id:req.userId
-    })
+    try {
+        // Update user information in the database
+        await User.updateOne(
+            { _id: req.userId }, // Query
+            body                 // Update data
+        );
 
-    res.json({
-        msg:"Updated successfully"
-    })
-})
+        // Respond with success
+        res.json({
+            msg: "Updated successfully"
+        });
+    } catch (error) {
+        // Handle potential errors
+        res.status(500).json({
+            message: "Internal server error",
+            error: error.message,
+        });
+    }
+});
+
 
 router.get('/bulk', async (req,res)=>{
     const filter=req.query.filter || "";
@@ -111,7 +125,7 @@ router.get('/bulk', async (req,res)=>{
         $or: [{
             firstName:{"$regex":filter}
         },{
-            lastName:{"regex":filter}
+            lastName:{"$regex":filter}
         }]
     })
     res.json({
