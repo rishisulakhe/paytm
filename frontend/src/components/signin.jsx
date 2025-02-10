@@ -1,4 +1,4 @@
-import { FaUserGraduate } from "react-icons/fa"
+
 import { BottomWarning } from "../Helpers/BottomWarning"
 import { Button } from "../Helpers/Button"
 import { Heading } from "../Helpers/Heading"
